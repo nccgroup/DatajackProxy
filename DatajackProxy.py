@@ -6,47 +6,17 @@ import sys
 import binascii
 import argparse
 
-session = frida.attach("opensslclient")
-
-script = session.create_script("""
-functionPointer = Module.findExportByName(null, "SSL_write");
-console.log(ptr(functionPointer));
-Interceptor.attach(ptr(functionPointer), {
-    onEnter: function(args) {
-    	send(args[2].toInt32());
-        send(ptr(args[1]));
-        var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-        console.log(typeof(buf));
-        send(args[2].toInt32(), buf);
-
-        
-    }
-});
-""")
-
-#session = frida.attach("opensslclient")
-#
-#script = session.create_script("""
-#functionPointer = Module.findExportByName(null, "SSL_write");
-#console.log(ptr(functionPointer));
-#Interceptor.attach(ptr(functionPointer), {
-    #onEnter: function(args) {
-        #send(args[2].toInt32());
-        #send(ptr(args[1]));
-        #var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-        #console.log(typeof(buf));
-        #send(args[2].toInt32(), buf);
-#
-#        
-    #}
-#});
-#""")
 def main():
-    parser = argparse.ArgumentParser(description='main arguments, flags for what settings, what os, what PID?')
-    parser.add_argument('help', metavar='h', type=str, help='The help flag')
-    parser.add_argument('-p', help='PID to attach to, if this is set, \'-s\' flag for spawning is ignored')
-
+    parser = argparse.ArgumentParser()
+    #parser.add_argument('help', metavar='h', type=str, help='The help flag')
+    parser.add_argument('-p', '--pid', help='pid to attach to', type=int)
+    parser.add_argument('-n', '--name', help='process name to attach to', type=str)
     args = parser.parse_args()
+
+    if args.pid:
+        attach(args.pid)
+    elif args.name:
+        attach(args.name)
 
     exit(0)
 
@@ -54,6 +24,51 @@ def main():
 def help():
     exit(0)
 
+def attach(processToAttach):
+    print("[*] Attaching to " + str(processToAttach))
+    session = frida.attach(processToAttach)
+
+    script = session.create_script("""
+    functionPointer = Module.findExportByName(null, "SSL_write");
+    console.log(ptr(functionPointer));
+    Interceptor.attach(ptr(functionPointer), {
+        onEnter: function(args) {
+            send(args[2].toInt32());
+            send(ptr(args[1]));
+            var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
+            console.log(typeof(buf));
+            send(args[2].toInt32(), buf);
+
+            
+        }
+    });
+    """)
+    print(script.on('message', on_message))
+    script.load()
+    sys.stdin.read()
+
+    #session = frida.attach("opensslclient")
+    #
+    #script = session.create_script("""
+    #functionPointer = Module.findExportByName(null, "SSL_write");
+    #console.log(ptr(functionPointer));
+    #Interceptor.attach(ptr(functionPointer), {
+        #onEnter: function(args) {
+            #send(args[2].toInt32());
+            #send(ptr(args[1]));
+            #var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
+            #console.log(typeof(buf));
+            #send(args[2].toInt32(), buf);
+    #
+    #        
+        #}
+    #});
+    #""")
+
+    exit(0)
+
+def printMessage(message):
+    exit(0)
 
 def on_message(message, data):
     #print(message['payload'])
@@ -84,9 +99,6 @@ def on_message(message, data):
         return 0
     else:
         print(message)
-print(script.on('message', on_message))
-script.load()
-sys.stdin.read()
 
 if __name__ == "__main__":
     main()
