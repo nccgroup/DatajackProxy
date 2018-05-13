@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from __future__ import print_function
 import frida
 import sys
@@ -45,7 +47,7 @@ def main():
     parser.add_argument('-p', help='PID to attach to, if this is set, \'-s\' flag for spawning is ignored')
 
     args = parser.parse_args()
-    
+
     exit(0)
 
 
