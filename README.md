@@ -29,7 +29,12 @@ This is accomplished by injecting JavaScript into the native process using the [
 **Attach** 
 
 Attach to existing process `<pid>`
+
 `python DatajackProxy.py -p <pid>`
+
+Attach to existing process with name `<processName>`
+
+`python DatajackProxy.py -n <processName>`
 
 ## Requirements and Installation
 * Python 3
