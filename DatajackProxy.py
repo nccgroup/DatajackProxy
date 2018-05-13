@@ -9,8 +9,9 @@ import argparse
 def main():
     parser = argparse.ArgumentParser()
     #parser.add_argument('help', metavar='h', type=str, help='The help flag')
-    parser.add_argument('-p', '--pid', help='pid to attach to', type=int)
-    parser.add_argument('-n', '--name', help='process name to attach to', type=str)
+    connectToProcessGroup = parser.add_mutually_exclusive_group()
+    connectToProcessGroup.add_argument('-p', '--pid', help='pid to attach to', type=int)
+    connectToProcessGroup.add_argument('-n', '--name', help='process name to attach to', type=str)
     args = parser.parse_args()
 
     if args.pid:
