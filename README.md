@@ -5,12 +5,12 @@ This is accomplished by injecting JavaScript into the native process using the [
 
 ## Features
 * Inject into process
-..* Linux (using OpenSSL)
-....*kTLS in Linux 4.13+ (TODO)
-..* MacOS (TODO)
-..* Windows (schannel) (TODO)
-..* iOS
-..* Android
+  * Linux (using OpenSSL)
+    *kTLS in Linux 4.13+ (TODO)
+  * MacOS (TODO)
+  * Windows (schannel) (TODO)
+  * iOS (TODO)
+  * Android (TODO)
 * Read data prior to outbound encryption
 * Write data prior to outbound encryption (TODO)
 * Read data after inbound decryption (TODO)
@@ -20,11 +20,14 @@ This is accomplished by injecting JavaScript into the native process using the [
 * File-based traffic capture, edit, and replay (TODO)
 * GUI (TODO)
 
+
 ## Usage
 **Help**
+
 `python DatajackProxy.py -h`
 
 **Attach** 
+
 Attach to existing process `<pid>`
 `python DatajackProxy.py -p <pid>`
 
