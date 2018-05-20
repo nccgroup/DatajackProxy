@@ -5,7 +5,8 @@ import frida
 import sys
 import binascii
 import argparse
-import codecs
+#import codecs
+import tempfile
 
 def main():
     parser = argparse.ArgumentParser()
@@ -19,6 +20,7 @@ def main():
         attach(args.pid)
     elif args.name:
         attach(args.name)
+        print("Back to Main()")
 
     exit(0)
 
@@ -32,90 +34,39 @@ def attach(processToAttach):
 
     script = session.create_script("""
     functionPointer = Module.findExportByName(null, "SSL_write");
-    console.log(ptr(functionPointer));
     Interceptor.attach(ptr(functionPointer), {
         onEnter: function(args) {
-            send(args[2].toInt32());
-            send(ptr(args[1]));
             var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-            console.log(typeof(buf));
-            send(args[2].toInt32(), buf);
-
-            
+            var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
+            send(ruleAndLength, buf);          
         }
     });
     """)
-    print(script.on('message', on_message))
+    script.on('message', on_message)
     script.load()
     sys.stdin.read()
 
-    #session = frida.attach("opensslclient")
-    #
-    #script = session.create_script("""
-    #functionPointer = Module.findExportByName(null, "SSL_write");
-    #console.log(ptr(functionPointer));
-    #Interceptor.attach(ptr(functionPointer), {
-        #onEnter: function(args) {
-            #send(args[2].toInt32());
-            #send(ptr(args[1]));
-            #var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-            #console.log(typeof(buf));
-            #send(args[2].toInt32(), buf);
-    #
-    #        
-        #}
-    #});
-    #""")
-
-    exit(0)
-
-def print_message(message):
     exit(0)
 
 def on_message(message, data):
     #print(message['payload'])
     if data:
-        '''
-        # data comes in as type bytes, which is immutable
-
-        # we print the bytes object, which prints as b'DATA'
-        print(data[0:])
-        write_file("[*] Raw\n")
-        write_file(data[0:])
-
-        # caste from immutable bytes to mutable bytearray
-        data = bytearray(data)
-
-        # test modify data, using hex. Can be a byte, as shown below, a char string like b'asdf' or even an int, 0-255.
-        data[3:4] = b'\x65'
-
-        # Below we print the bytearray as type bytes, but prints as hex
-        print(binascii.hexlify(bytearray(data)))
-        write_file("[*] hexlify\n")
-        write_file(binascii.hexlify(bytearray(data)))
-
-        # Below we print the bytearray data as a string, but appears as hex
-        stringVersion = ''.join('{:02x}'.format(x) for x in data)
-        print(stringVersion)
-        write_file("[*] stringFormat\n")
-        write_file(stringVersion)
-
-        # Below we print each byte with spacing!
-        breakOn = 2 #break string every 2 characters, to get hex bytes.
-        listVersion = [stringVersion[i:i+breakOn] for i in range(0, len(stringVersion), breakOn)]
-        print(listVersion)
-        #write_file("[*] cut-on-twos\n")
-        #write_file([stringVersion[i:i+breakOn] for i in range(0, len(stringVersion), breakOn)])
-        '''
-        print_bytes(data)
-
+        print(message['payload'])
+        print_bytes_for_ui(data)
+        #print_bytes_for_temp_file(data)
         return 0
     else:
         print(message)
 
-def get_user_input():
-    userInput = input("Enter byte string (I.E. \\xaa\\xbb):")
-    return(string_to_bytes(userInput))
+#def get_user_input():
+#    userInput = input("Enter byte string (I.E. \\xaa\\xbb):")
+#    return(string_to_bytes(userInput))
+
+def edit_bytes_in_temp_file(byteString):
+    f = tempfile.TemporaryFile()
+    fp.write(byteString)
+    input("Look for file in dir")
+    return(newByteString)
 
 def write_file(message):
     fileMode = 'a+'
@@ -134,9 +85,9 @@ def write_file(message):
         f.close()
     return 0
 
-def string_to_bytes(stringToBytes):
-    newBytes = codecs.decode(stringToBytes, 'unicode_escape')
-    return(newBytes)
+#def string_to_bytes(stringToBytes):
+#    newBytes = codecs.decode(stringToBytes, 'unicode_escape')
+#    return(newBytes)
 
 def bytes_to_string(in_bytes):
     resp = []
@@ -151,7 +102,7 @@ def bytes_to_human_lines(in_bytes, length=16):
     byteString = bytes_to_string(in_bytes)
     return [byteString[x:x+length] for x in range(0, len(byteString), length)]
 
-def print_bytes(in_bytes, length=16):
+def print_bytes_for_ui(in_bytes, length=16):
     print("          0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F 0123456789ABCDEF")
     lines = bytes_to_human_lines(in_bytes, length)
     for j in range(len(lines)):
@@ -166,6 +117,31 @@ def print_bytes(in_bytes, length=16):
         output = hex(byte_index)[2:].zfill(8) + ' ' + ' '.join(lines[j])
         output += ' ' * (56 - len(output))
         print(output, readable)
+
+def print_bytes_for_temp_file(in_bytes, length=16):
+    output = ''
+    blockOfHexBytes = ''
+    instructions = '[*] Edit hex below. Save and quit to make changes.\n'
+    readable = ''
+    readableSizePerLine = 0
+    lines = bytes_to_human_lines(in_bytes, length)
+    for j in range(len(lines)):
+        for c in lines[j]:
+            byte = int(c, 16)
+            if byte < 128:
+                readable += chr(byte)
+            else:
+                readable += '.'
+            if readableSizePerLine >= length - 1:
+                readable += '\n'
+                readableSizePerLine = 0
+            else:
+                readableSizePerLine+=1
+        blockOfHexBytes += ' '.join(lines[j])
+        blockOfHexBytes += '\n'
+    appendOldBytes = "[*] End of hex\n[*] Original bytes were:\n" + blockOfHexBytes
+    output += instructions + blockOfHexBytes + appendOldBytes + "[*] ASCII was:\n" + readable
+    print(output)
 
 def read_byte_string(byteString):
     hex_list = byteString.split()
