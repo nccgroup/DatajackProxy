@@ -25,21 +25,18 @@ def run_frida_stuff(queueFridaBuffers, queueUserInput):
     buff = "\x65\x65\x00"
     hasPrintedBuffer = False
     #    queueFridaBuffers.put(buff)
-        #time.sleep(10)
         #print("[*] In frida loop")
     if queueUserInput.empty() and not hasPrintedBuffer:
         print(buff)
     while queueUserInput.empty():
         #print(queueFridaBuffers.get())
-        #print("[*] Sleeping frida thread for 5 seconds...")
         #print("[FRIDA] No User Input")
-        time.sleep(0.5)
+        pass
     else:
         userInput = queueUserInput.get()
         print("[FRIDA] User input is:" + userInput)
         if(userInput == "y"):
             queueFridaBuffers.get()
-    #time.sleep(5)
     #sys.stdin.read()
 
 def attach(queueFridaBuffers, queueUserInput, processToAttach):
@@ -69,13 +66,14 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
 def on_message(message, data):
     #print(message['payload'])
     if data:
-        queueFridaBuffers.put(data)
         print(message['payload'])
         print_bytes_for_ui(data)
-        willEdit = "wait"
-        while(willEdit == "wait"):
-            time.sleep(1)
-        print("[FridaThread] Passed while wait")
+        queueFridaBuffers.put(data)
+        #willEdit = "wait"
+        #while(willEdit == "wait"):
+        #    pass
+        queueUserInput.get()
+        print("[FridaThread] Passed queue wait")
         return 0
     else:
         print(message)
@@ -129,10 +127,10 @@ def user_input_thread(queueFridaBuffers, queueUserInput):
         if queueUserInput.empty():
             willEdit = will_user_edit()
             queueUserInput.put(willEdit)
-        time.sleep(2)
+        #time.sleep(2)
+        pass
 
 def print_bytes_for_ui(inBytes, length=16):
-    print("[*] Starting print_bytes_for_ui")
     print("          0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F 0123456789ABCDEF")
     lines = bytes_to_human_lines(inBytes, length)
     for j in range(len(lines)):
@@ -177,7 +175,7 @@ queueFridaBuffers = Queue(maxsize=0)
 queueUserInput = Queue(maxsize=0)
 num_threads = 2
 
-def print_bytes_for_temp_file(inBytes, length=16):
+def make_bytes_for_temp_file(inBytes, length=16):
     output = ''
     blockOfHexBytes = ''
     instructions = '[*] Edit hex below. Save and quit to make changes.\n'
@@ -200,7 +198,7 @@ def print_bytes_for_temp_file(inBytes, length=16):
         blockOfHexBytes += '\n'
     appendOldBytes = "[*] End of hex\n[*] Original bytes were:\n" + blockOfHexBytes
     output += instructions + blockOfHexBytes + appendOldBytes + "[*] ASCII was:\n" + readable
-    print(output)
+    return(output)
 
 def read_byte_string(byteString):
     hex_list = byteString.split()
@@ -211,6 +209,7 @@ def main():
 
     # Default to Linux OS
     os = 'linux'
+    hasUserGivenInput = False
     parser = argparse.ArgumentParser()
     #parser.add_argument('help', metavar='h', type=str, help='The help flag')
     parser.add_argument("-o", "--os", help="Set OS to either 'linux', 'windows', or 'mac'", type=str, choices=["linux", "windows", "mac"])
@@ -236,17 +235,18 @@ def main():
     fridaThread.setDaemon(True)
     fridaThread.start()
 
-    #queueUserInput.put("y")
     while True:
-        #print("in while")
-        #print(not queueFridaBuffers.empty())
         if not queueFridaBuffers.empty():
-            #print(queueFridaBuffers.get())
+            fridaBuffer = queueFridaBuffers.get()
             willEdit = will_user_edit()
+            willEditTest2 = will_user_edit()
+            print(willEditTest2)
+            if(willEdit == "y"):
+                print(make_bytes_for_temp_file(fridaBuffer))
             print(willEdit)
             queueUserInput.put(willEdit)
         else:
-            time.sleep(1)
+            pass
 
     exit(0)
 
