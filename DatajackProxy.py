@@ -3,12 +3,15 @@
 from __future__ import print_function
 from queue import *
 from threading import Thread
+#from tempfile import mkstemp
+import tempfile
 import time
 import sys
 import frida
 import binascii
 import argparse
-import tempfile
+import webbrowser
+import os
 
 def do_stuff(queueFridaBuffers, queueUserInput):
     while True:
@@ -77,13 +80,6 @@ def on_message(message, data):
         return 0
     else:
         print(message)
-
-def edit_bytes_in_temp_file(byteString):
-    newByteString = byteString
-    f = tempfile.TemporaryFile()
-    fp.write(byteString)
-    input("Look for file in dir")
-    return(newByteString)
 
 def write_file(message):
     fileMode = 'a+'
@@ -200,6 +196,38 @@ def make_bytes_for_temp_file(inBytes, length=16):
     output += instructions + blockOfHexBytes + appendOldBytes + "[*] ASCII was:\n" + readable
     return(output)
 
+def edit_bytes_in_temp_file(byteString):
+    newByteString = byteString
+    #with tempfile.TemporaryFile('w+') as tmp:
+    #    tmp.write(byteString)
+    '''
+    tempFileDescriptor, tempFilePath = mkstemp(text=True)
+    try:
+        with os.fdopen(tempFileDescriptor, 'w') as tmp:
+            print("byteString:\n"+byteString)
+            tmp.write(byteString)
+            input("Test:"+tempFilePath)
+    finally:
+        os.remove(tempFilePath)
+    '''
+
+    tmp = tempfile.NamedTemporaryFile("w+", delete=True)
+    try:
+        print("byteString:\n"+byteString)
+        tmp.write(byteString)
+        input("Test")
+    finally:
+        tmp.close()
+
+    #print(tempFileDescriptor)
+    #print(type(tempFilePath))
+
+        #print(tmp.read())
+    #f.write(byteString)
+    #file = open("testfile","w+")
+    #file.write(byteString)
+    return(newByteString)
+
 def read_byte_string(byteString):
     hex_list = byteString.split()
     return bytes([int(x, 16) for x in hex_list])
@@ -239,19 +267,15 @@ def main():
         if not queueFridaBuffers.empty():
             fridaBuffer = queueFridaBuffers.get()
             willEdit = will_user_edit()
-            willEditTest2 = will_user_edit()
-            print(willEditTest2)
             if(willEdit == "y"):
-                print(make_bytes_for_temp_file(fridaBuffer))
+                bytesToEdit = make_bytes_for_temp_file(fridaBuffer)
+                edit_bytes_in_temp_file(bytesToEdit)
             print(willEdit)
             queueUserInput.put(willEdit)
         else:
             pass
 
     exit(0)
-
-
-
 
 if __name__ == "__main__":
     main()
