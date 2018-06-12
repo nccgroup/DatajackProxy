@@ -3,15 +3,18 @@
 from __future__ import print_function
 from queue import *
 from threading import Thread
-#from tempfile import mkstemp
-import tempfile
+from tempfile import mkstemp
+#import tempfile
 import time
 import sys
 import frida
 import binascii
 import argparse
 import webbrowser
+import subprocess
 import os
+
+block = True
 
 def do_stuff(queueFridaBuffers, queueUserInput):
     while True:
@@ -62,7 +65,8 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
     """)
     script.on('message', on_message)
     script.load()
-    sys.stdin.read()
+    while block:
+        time.sleep(1)
 
     exit(0)
 
@@ -200,24 +204,43 @@ def edit_bytes_in_temp_file(byteString):
     newByteString = byteString
     #with tempfile.TemporaryFile('w+') as tmp:
     #    tmp.write(byteString)
-    '''
+
+    try:
+        editor = os.getenv("EDITOR")
+        if editor:
+            print(editor)
+        else:
+            editor = 'vi'
+    finally:
+        print("Passed Try")
+
     tempFileDescriptor, tempFilePath = mkstemp(text=True)
     try:
         with os.fdopen(tempFileDescriptor, 'w') as tmp:
-            print("byteString:\n"+byteString)
+            #print("byteString:\n"+byteString)
             tmp.write(byteString)
+            #tmp.write(byteString)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+            editProc = subprocess.Popen(['vim', '-f', '-o'], close_fds=True, stdout=None)
+            editProc.communicate()
             input("Test:"+tempFilePath)
     finally:
         os.remove(tempFilePath)
-    '''
 
+    '''
     tmp = tempfile.NamedTemporaryFile("w+", delete=True)
     try:
         print("byteString:\n"+byteString)
         tmp.write(byteString)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        print(tmp.name())
+        #webbrowser.open_new_tab()
         input("Test")
     finally:
         tmp.close()
+    '''
 
     #print(tempFileDescriptor)
     #print(type(tempFilePath))
