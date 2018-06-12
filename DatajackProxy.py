@@ -3,6 +3,7 @@
 from __future__ import print_function
 from queue import *
 from threading import Thread
+import threading
 from tempfile import mkstemp
 #import tempfile
 import time
@@ -12,9 +13,15 @@ import binascii
 import argparse
 import webbrowser
 import subprocess
+import random
 import os
 
 block = True
+hexLineEnd = "[*] Edit hex above. Save and quit to make changes.\n"
+queueFridaBuffers = Queue(maxsize=0)
+queueUserInput = Queue(maxsize=0)
+num_threads = 2
+
 
 def do_stuff(queueFridaBuffers, queueUserInput):
     while True:
@@ -24,29 +31,10 @@ def do_stuff(queueFridaBuffers, queueUserInput):
         print(queueUserInput.get())
         queueUserInput.task_done()
 
-def run_frida_stuff(queueFridaBuffers, queueUserInput):
-    #print("[*] Starting run_frida_stuff")
-    #fakeBuffers = ["\x65\x65\x65\x00", "\x66\x66\x66\x00", "\x67\x67\x67\x00", "\x68\x68\x68\x00"]
-    #for buff in fakeBuffers:
-    buff = "\x65\x65\x00"
-    hasPrintedBuffer = False
-    #    queueFridaBuffers.put(buff)
-        #print("[*] In frida loop")
-    if queueUserInput.empty() and not hasPrintedBuffer:
-        print(buff)
-    while queueUserInput.empty():
-        #print(queueFridaBuffers.get())
-        #print("[FRIDA] No User Input")
-        pass
-    else:
-        userInput = queueUserInput.get()
-        print("[FRIDA] User input is:" + userInput)
-        if(userInput == "y"):
-            queueFridaBuffers.get()
-    #sys.stdin.read()
-
 def attach(queueFridaBuffers, queueUserInput, processToAttach):
+    mythread = threading.currentThread()
     print("[*] Attaching to " + str(processToAttach))
+    #print("[FridaThread]", mythread.getName(), ":", "blarg")
     session = frida.attach(processToAttach)
 
     script = session.create_script("""
@@ -70,37 +58,27 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
 
     exit(0)
 
+waiting = {}
+fridaBufferID = 1000000
+
 def on_message(message, data):
-    #print(message['payload'])
+    global fridaBufferID
+    currentFridaBufferId = fridaBufferID
+    fridaBufferID += 1
     if data:
         print(message['payload'])
         print_bytes_for_ui(data)
-        queueFridaBuffers.put(data)
-        #willEdit = "wait"
-        #while(willEdit == "wait"):
-        #    pass
-        queueUserInput.get()
-        print("[FridaThread] Passed queue wait")
+        waiting[fridaBufferID] = None
+        queueFridaBuffers.put((fridaBufferID, data))
+        while True:
+            time.sleep(1)
+        while(waiting[fridaBufferID] is None):
+           time.sleep(1)
+        new_data = waiting[fridaBufferID]
+        del waiting[fridaBufferID]
         return 0
     else:
         print(message)
-
-def write_file(message):
-    fileMode = 'a+'
-    if isinstance(message, str):
-        fileMode = 'a+'
-    elif isinstance(message, bytes):
-        fileMode = 'ab+'
-    with open('../testfile', fileMode) as f:
-        read_data = f.read()
-        print("[*] reading from testfile")
-        print(read_data)
-        f.write(message)
-        f.close()
-    with open('../testfile', 'a') as f:
-        f.write('\n')
-        f.close()
-    return 0
 
 #def string_to_bytes(stringToBytes):
 #    newBytes = codecs.decode(stringToBytes, 'unicode_escape')
@@ -127,7 +105,6 @@ def user_input_thread(queueFridaBuffers, queueUserInput):
         if queueUserInput.empty():
             willEdit = will_user_edit()
             queueUserInput.put(willEdit)
-        #time.sleep(2)
         pass
 
 def print_bytes_for_ui(inBytes, length=16):
@@ -165,21 +142,14 @@ def will_user_edit():
     userInput = input()
     if(userInput.lower() == "n" or userInput.lower() == "no"):
         userInput = "n"
-        #print("Did not choose to edit")
     else:
         userInput = "y"
-        #print("Chose to edit")
     return(userInput)
 
-queueFridaBuffers = Queue(maxsize=0)
-queueUserInput = Queue(maxsize=0)
-num_threads = 2
-
 def make_bytes_for_temp_file(inBytes, length=16):
-    output = ''
-    blockOfHexBytes = ''
-    instructions = '[*] Edit hex below. Save and quit to make changes.\n'
-    readable = ''
+    output = ""
+    blockOfHexBytes = ""
+    readable = ""
     readableSizePerLine = 0
     lines = bytes_to_human_lines(inBytes, length)
     for j in range(len(lines)):
@@ -195,60 +165,43 @@ def make_bytes_for_temp_file(inBytes, length=16):
             else:
                 readableSizePerLine+=1
         blockOfHexBytes += ' '.join(lines[j])
-        blockOfHexBytes += '\n'
-    appendOldBytes = "[*] End of hex\n[*] Original bytes were:\n" + blockOfHexBytes
-    output += instructions + blockOfHexBytes + appendOldBytes + "[*] ASCII was:\n" + readable
+        blockOfHexBytes += "\n"
+    appendOldBytes = hexLineEnd + "[*] Original bytes were:\n" + blockOfHexBytes
+    output += blockOfHexBytes + appendOldBytes + "[*] ASCII was:\n" + readable
     return(output)
 
 def edit_bytes_in_temp_file(byteString):
     newByteString = byteString
-    #with tempfile.TemporaryFile('w+') as tmp:
-    #    tmp.write(byteString)
-
     try:
         editor = os.getenv("EDITOR")
         if editor:
             print(editor)
         else:
-            editor = 'vi'
+            editor = 'vim'
     finally:
-        print("Passed Try")
+        #print("Passed Try")
+        pass
 
     tempFileDescriptor, tempFilePath = mkstemp(text=True)
     try:
-        with os.fdopen(tempFileDescriptor, 'w') as tmp:
-            #print("byteString:\n"+byteString)
+        with os.fdopen(tempFileDescriptor, 'r+') as tmp:
             tmp.write(byteString)
-            #tmp.write(byteString)
             tmp.flush()
             os.fsync(tmp.fileno())
-            editProc = subprocess.Popen(['vim', '-f', '-o'], close_fds=True, stdout=None)
+            #TODO: Make the arguments work for editors other than Vim
+            editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
             editProc.communicate()
-            input("Test:"+tempFilePath)
+            bytesFromFile = ""
+            tmp.seek(0)
+            for line in tmp:
+                if(line in hexLineEnd):
+                    break
+                else:
+                    bytesFromFile += line
+            print(bytesFromFile)
     finally:
         os.remove(tempFilePath)
 
-    '''
-    tmp = tempfile.NamedTemporaryFile("w+", delete=True)
-    try:
-        print("byteString:\n"+byteString)
-        tmp.write(byteString)
-        tmp.flush()
-        os.fsync(tmp.fileno())
-        print(tmp.name())
-        #webbrowser.open_new_tab()
-        input("Test")
-    finally:
-        tmp.close()
-    '''
-
-    #print(tempFileDescriptor)
-    #print(type(tempFilePath))
-
-        #print(tmp.read())
-    #f.write(byteString)
-    #file = open("testfile","w+")
-    #file.write(byteString)
     return(newByteString)
 
 def read_byte_string(byteString):
@@ -262,7 +215,6 @@ def main():
     os = 'linux'
     hasUserGivenInput = False
     parser = argparse.ArgumentParser()
-    #parser.add_argument('help', metavar='h', type=str, help='The help flag')
     parser.add_argument("-o", "--os", help="Set OS to either 'linux', 'windows', or 'mac'", type=str, choices=["linux", "windows", "mac"])
     connectToProcessGroup = parser.add_mutually_exclusive_group()
     connectToProcessGroup.add_argument("-p", "--pid", help="pid to attach to", type=int)
@@ -288,12 +240,12 @@ def main():
 
     while True:
         if not queueFridaBuffers.empty():
-            fridaBuffer = queueFridaBuffers.get()
+            id, fridaBuffer = queueFridaBuffers.get()
             willEdit = will_user_edit()
             if(willEdit == "y"):
-                bytesToEdit = make_bytes_for_temp_file(fridaBuffer)
-                edit_bytes_in_temp_file(bytesToEdit)
+                edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer))
             print(willEdit)
+            waiting[id] = fridaBuffer
             queueUserInput.put(willEdit)
         else:
             pass
