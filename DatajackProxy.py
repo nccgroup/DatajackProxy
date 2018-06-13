@@ -14,6 +14,7 @@ import argparse
 import webbrowser
 import subprocess
 import random
+import codecs
 import os
 
 block = True
@@ -22,20 +23,13 @@ queueFridaBuffers = Queue(maxsize=0)
 queueUserInput = Queue(maxsize=0)
 num_threads = 2
 
-
-def do_stuff(queueFridaBuffers, queueUserInput):
-    while True:
-        print(queueFridaBuffers.get())
-        queueFridaBuffers.task_done()
-
-        print(queueUserInput.get())
-        queueUserInput.task_done()
-
 def attach(queueFridaBuffers, queueUserInput, processToAttach):
     mythread = threading.currentThread()
     print("[*] Attaching to " + str(processToAttach))
     #print("[FridaThread]", mythread.getName(), ":", "blarg")
     session = frida.attach(processToAttach)
+
+    global script
 
     script = session.create_script("""
     functionPointer = Module.findExportByName(null, "SSL_write");
@@ -44,8 +38,8 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
             var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
             send(ruleAndLength, buf);
-            var userResponse = recv('input', function(value) {
-                args[0] = ptr(value.payload);
+            var userResponse = recv(buffer, function(value) {
+                args[1] = ptr(value.payload);
             });
             userResponse.wait();
         }
@@ -59,30 +53,38 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
     exit(0)
 
 waiting = {}
-fridaBufferID = 1000000
+fridaBufferId = 1000000
 
 def on_message(message, data):
-    global fridaBufferID
-    currentFridaBufferId = fridaBufferID
-    fridaBufferID += 1
+    global fridaBufferId
+    global script
+    checkBuffers = True
+    currentFridaBufferId = fridaBufferId
+    fridaBufferId += 1
     if data:
         print(message['payload'])
         print_bytes_for_ui(data)
-        waiting[fridaBufferID] = None
-        queueFridaBuffers.put((fridaBufferID, data))
-        while True:
-            time.sleep(1)
-        while(waiting[fridaBufferID] is None):
-           time.sleep(1)
-        new_data = waiting[fridaBufferID]
-        del waiting[fridaBufferID]
+        waiting[currentFridaBufferId] = None
+        queueFridaBuffers.put((currentFridaBufferId, data))
+        #while(waiting[currentFridaBufferId] is None):
+        #   time.sleep(1)
+        #new_data = waiting[currentFridaBufferId]
+        #del waiting[currentFridaBufferId]
+        while(checkBuffers):
+            checkId, checkBuffer = queueUserInput.get()
+            if(checkId is currentFridaBufferId):
+                checkBuffers = False
+                script.post({checkBuffer})
+            else:
+                queueUserInput.put((checkId, checkBuffer))
+                time.sleep(1)
         return 0
     else:
         print(message)
 
-#def string_to_bytes(stringToBytes):
-#    newBytes = codecs.decode(stringToBytes, 'unicode_escape')
-#    return(newBytes)
+def string_to_bytes(stringToBytes):
+    newBytes = codecs.decode(stringToBytes, 'unicode_escape')
+    return(newBytes)
 
 def select_os(osSelection):
     if(osSelection == "determine"):
@@ -104,7 +106,7 @@ def user_input_thread(queueFridaBuffers, queueUserInput):
         print("[*] In user input loop")
         if queueUserInput.empty():
             willEdit = will_user_edit()
-            queueUserInput.put(willEdit)
+            #queueUserInput.put(willEdit)
         pass
 
 def print_bytes_for_ui(inBytes, length=16):
@@ -171,7 +173,7 @@ def make_bytes_for_temp_file(inBytes, length=16):
     return(output)
 
 def edit_bytes_in_temp_file(byteString):
-    newByteString = byteString
+    bytesFromFile = byteString
     try:
         editor = os.getenv("EDITOR")
         if editor:
@@ -179,7 +181,6 @@ def edit_bytes_in_temp_file(byteString):
         else:
             editor = 'vim'
     finally:
-        #print("Passed Try")
         pass
 
     tempFileDescriptor, tempFilePath = mkstemp(text=True)
@@ -198,11 +199,16 @@ def edit_bytes_in_temp_file(byteString):
                     break
                 else:
                     bytesFromFile += line
-            print(bytesFromFile)
     finally:
         os.remove(tempFilePath)
 
-    return(newByteString)
+    return(bytesFromFile)
+
+def make_bytes_from_file_back_into_buffer(multiLineByteString):
+    stringToEdit = "".join(multiLineByteString.splitlines()).replace(" ", "")
+    newBuffer = codecs.decode(stringToEdit, "hex")
+    return(newBuffer)
+    #print(newBuffer)
 
 def read_byte_string(byteString):
     hex_list = byteString.split()
@@ -240,13 +246,11 @@ def main():
 
     while True:
         if not queueFridaBuffers.empty():
-            id, fridaBuffer = queueFridaBuffers.get()
+            bufferId, fridaBuffer = queueFridaBuffers.get()
             willEdit = will_user_edit()
             if(willEdit == "y"):
-                edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer))
-            print(willEdit)
-            waiting[id] = fridaBuffer
-            queueUserInput.put(willEdit)
+                newBuffer = make_bytes_from_file_back_into_buffer(edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer)))
+                queueUserInput.put((bufferId, newBuffer))
         else:
             pass
 
