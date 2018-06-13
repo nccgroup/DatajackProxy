@@ -16,6 +16,7 @@ import subprocess
 import random
 import codecs
 import os
+import base64
 
 block = True
 hexLineEnd = "[*] Edit hex above. Save and quit to make changes.\n"
@@ -38,8 +39,10 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
             var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
             send(ruleAndLength, buf);
-            var userResponse = recv(buffer, function(value) {
-                args[1] = ptr(value.payload);
+            var userResponse = recv('input', function(value) {
+                //args[1] = ptr(value.payload);
+                //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
+                console.log(value.payload)
             });
             userResponse.wait();
         }
@@ -71,12 +74,12 @@ def on_message(message, data):
         #new_data = waiting[currentFridaBufferId]
         #del waiting[currentFridaBufferId]
         while(checkBuffers):
-            checkId, checkBuffer = queueUserInput.get()
+            checkId, encodedBuffer = queueUserInput.get()
             if(checkId is currentFridaBufferId):
                 checkBuffers = False
-                script.post({checkBuffer})
+                script.post({'type': 'input', 'payload': encodedBuffer})
             else:
-                queueUserInput.put((checkId, checkBuffer))
+                queueUserInput.put((checkId, encodedBuffer))
                 time.sleep(1)
         return 0
     else:
@@ -204,10 +207,12 @@ def edit_bytes_in_temp_file(byteString):
 
     return(bytesFromFile)
 
-def make_bytes_from_file_back_into_buffer(multiLineByteString):
+def make_buffer_from_file(multiLineByteString):
     stringToEdit = "".join(multiLineByteString.splitlines()).replace(" ", "")
     newBuffer = codecs.decode(stringToEdit, "hex")
-    return(newBuffer)
+    encodedBuffer = base64.b64encode(newBuffer)
+    encodedBuffer = encodedBuffer.decode()
+    return(encodedBuffer)
     #print(newBuffer)
 
 def read_byte_string(byteString):
@@ -249,8 +254,8 @@ def main():
             bufferId, fridaBuffer = queueFridaBuffers.get()
             willEdit = will_user_edit()
             if(willEdit == "y"):
-                newBuffer = make_bytes_from_file_back_into_buffer(edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer)))
-                queueUserInput.put((bufferId, newBuffer))
+                encodedBuffer = make_buffer_from_file(edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer)))
+                queueUserInput.put((bufferId, encodedBuffer))
         else:
             pass
 
