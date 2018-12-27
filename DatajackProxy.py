@@ -164,6 +164,9 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         onEnter: function(args) {
             var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
             var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
+            console.log("Buffer before sending to Python: ");
+            console.log(buf);
+            console.log("done");
             send(ruleAndLength, buf);
             var userResponse = recv('input', function(value) {
                 //args[1] = ptr(value.payload);
@@ -171,6 +174,12 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                 console.log(value.payload);
                 var decodedPayload = base64.decode(value.payload);
                 console.log(decodedPayload);
+                //var byteArray = new Uint8Array(1);
+                newlyAllocString = Memory.allocUtf8String(decodedPayload);
+                //newlyAllocArray = Memory.alloc(64);
+                //Memory.copy(newlyAllocArray, decodedPayload, 63);
+                //args[1] = newlyAllocArray;
+                args[1] = newlyAllocString;
             });
             userResponse.wait();
         }
@@ -194,6 +203,7 @@ def on_message(message, data):
     fridaBufferId += 1
     if data:
         print(message['payload'])
+        print("RUNNING ON_MESSAGE")
         print_bytes_for_ui(data)
         waiting[currentFridaBufferId] = None
         queueFridaBuffers.put((currentFridaBufferId, data))
@@ -338,8 +348,10 @@ def edit_bytes_in_temp_file(byteString):
 def make_buffer_from_file(multiLineByteString):
     stringToEdit = "".join(multiLineByteString.splitlines()).replace(" ", "")
     newBuffer = codecs.decode(stringToEdit, "hex")
+    print(newBuffer)
     encodedBuffer = base64.b64encode(newBuffer)
     encodedBuffer = encodedBuffer.decode()
+    print(encodedBuffer)
     return(encodedBuffer)
     #print(newBuffer)
 
