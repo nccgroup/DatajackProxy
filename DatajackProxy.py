@@ -159,14 +159,16 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
     }
     }(this));
 
-    functionPointer = Module.findExportByName(null, "SSL_write");
-    Interceptor.attach(ptr(functionPointer), {
+    try 
+    {
+    functionPointer_OpenSSL_SSL_write = Module.findExportByName(null, "SSL_write");
+    Interceptor.attach(ptr(functionPointer_OpenSSL_SSL_write), {
         onEnter: function(args) {
             var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
             var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-            console.log("Buffer before sending to Python: ");
-            console.log(buf);
-            console.log("done");
+            //console.log("Buffer before sending to Python: ");
+            //console.log(buf);
+            //console.log("done");
             send(ruleAndLength, buf);
             var userResponse = recv('input', function(value) {
                 //args[1] = ptr(value.payload);
@@ -184,6 +186,46 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             userResponse.wait();
         }
     });
+    }
+    catch(err)
+    {
+        console.log("Couldn't find openSSL ssl_write, trying regular sockets");
+
+        try
+        {
+        functionPointer_LinuxSocket_read = Module.findExportByName(null, "write");
+        Interceptor.attach(ptr(functionPointer_LinuxSocket_read), {
+            onEnter: function(args) {
+                var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
+                var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
+                //console.log("Buffer before sending to Python: ");
+                //console.log(buf);
+                //console.log("done");
+                send(ruleAndLength, buf);
+                var userResponse = recv('input', function(value) {
+                    //args[1] = ptr(value.payload);
+                    //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
+                    console.log(value.payload);
+                    var decodedPayload = base64.decode(value.payload);
+                    console.log(decodedPayload);
+                    //var byteArray = new Uint8Array(1);
+                    newlyAllocString = Memory.allocUtf8String(decodedPayload);
+                    //newlyAllocArray = Memory.alloc(64);
+                    //Memory.copy(newlyAllocArray, decodedPayload, 63);
+                    //args[1] = newlyAllocArray;
+                    args[1] = newlyAllocString;
+                });
+                userResponse.wait();
+            }
+        });
+        }
+        catch(err)
+        {
+            console.log("Couldn't find socket write");
+        }
+    }
+
+
     """)
     script.on('message', on_message)
     script.load()
@@ -258,7 +300,7 @@ def print_bytes_for_ui(inBytes, length=16):
         readable = ''
         for c in lines[j]:
             byte = int(c, 16)
-            if byte < 128:
+            if(byte < 128 and byte > 0):
                 readable += chr(byte)
             else:
                 readable += '.'
@@ -274,7 +316,7 @@ def bytes_to_string(inBytes):
     resp = []
     for x in inBytes:
         out = hex(x)[2:]
-        if x < 10:
+        if x < 16:
             out = '0' + out
         resp.append(out)
     return resp
