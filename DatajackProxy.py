@@ -300,7 +300,7 @@ def print_bytes_for_ui(inBytes, length=16):
         readable = ''
         for c in lines[j]:
             byte = int(c, 16)
-            if(byte < 128 and byte > 0):
+            if(byte > 32 and byte < 127):
                 readable += chr(byte)
             else:
                 readable += '.'
@@ -340,7 +340,7 @@ def make_bytes_for_temp_file(inBytes, length=16):
     for j in range(len(lines)):
         for c in lines[j]:
             byte = int(c, 16)
-            if byte < 128:
+            if(byte > 32 and byte < 127):
                 readable += chr(byte)
             else:
                 readable += '.'
