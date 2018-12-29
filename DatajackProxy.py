@@ -159,6 +159,18 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
     }
     }(this));
 
+    function decodedStringToArrayBuffer(decodedString)
+    {
+        var bufferToReturn = new ArrayBuffer(decodedString.length);
+        var bufferToReturnView = new Uint8Array(bufferToReturn);
+        for (i = 0; i < decodedString.length; i++)
+        {
+            bufferToReturnView[i] = decodedString.charCodeAt(i);
+        }
+
+        return bufferToReturn;
+    }
+
     try 
     {
     functionPointer_OpenSSL_SSL_write = Module.findExportByName(null, "SSL_write");
@@ -176,15 +188,15 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                 {
                     //args[1] = ptr(value.payload);
                     //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
-                    console.log(value.payload);
+                    //console.log(value.payload);
                     var decodedPayload = base64.decode(value.payload);
-                    console.log(decodedPayload);
+                    editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                    //console.log(typeof(editedBufferFromUser));
                     //var byteArray = new Uint8Array(1);
                     newlyAllocString = Memory.allocUtf8String(decodedPayload);
-                    //newlyAllocArray = Memory.alloc(64);
-                    //Memory.copy(newlyAllocArray, decodedPayload, 63);
-                    //args[1] = newlyAllocArray;
-                    args[1] = newlyAllocString;
+                    newlyAllocBuffer = Memory.alloc(decodedPayload.length);
+                    Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                    args[1] = newlyAllocBuffer;
                 }
             });
             userResponse.wait();
@@ -211,16 +223,17 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                         //console.log("WriteInterceptor: " + value.payload);
                         if(value.payload != "DJP*NoEdit")
                         {
-                            var decodedPayload = new ArrayBuffer;
-                            //decodedPayload = base64.decode(value.payload);
-                            //var byteArray = new Uint8Array();
-                            //newlyAllocString = Memory.allocUtf8String(decodedPayload);
-                            newlyAllocArray = Memory.alloc(64);
-                            arrayToWrite = new ArrayBuffer(64);
-                            //editedBufferInMemory = Memory.writeByteArray(newlyAllocArray, 0xFF);
-                            //Memory.copy(newlyAllocArray, decodedPayload, 63);
-                            //args[1] = newlyAllocArray;
-                            //args[1] = newlyAllocString;
+                            //args[1] = ptr(value.payload);
+                            //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
+                            //console.log(value.payload);
+                            var decodedPayload = base64.decode(value.payload);
+                            editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                            //console.log(typeof(editedBufferFromUser));
+                            //var byteArray = new Uint8Array(1);
+                            newlyAllocString = Memory.allocUtf8String(decodedPayload);
+                            newlyAllocBuffer = Memory.alloc(decodedPayload.length);
+                            Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                            args[1] = newlyAllocBuffer;
                         }
                     });
                     userResponse.wait();
