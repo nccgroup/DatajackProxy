@@ -171,17 +171,21 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             //console.log("done");
             send(ruleAndLength, buf);
             var userResponse = recv('input', function(value) {
-                //args[1] = ptr(value.payload);
-                //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
-                console.log(value.payload);
-                var decodedPayload = base64.decode(value.payload);
-                console.log(decodedPayload);
-                //var byteArray = new Uint8Array(1);
-                newlyAllocString = Memory.allocUtf8String(decodedPayload);
-                //newlyAllocArray = Memory.alloc(64);
-                //Memory.copy(newlyAllocArray, decodedPayload, 63);
-                //args[1] = newlyAllocArray;
-                args[1] = newlyAllocString;
+                console.log("WriteInterceptor: " + value.payload);
+                if(value.payload != "DJP*NoEdit")
+                {
+                    //args[1] = ptr(value.payload);
+                    //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
+                    console.log(value.payload);
+                    var decodedPayload = base64.decode(value.payload);
+                    console.log(decodedPayload);
+                    //var byteArray = new Uint8Array(1);
+                    newlyAllocString = Memory.allocUtf8String(decodedPayload);
+                    //newlyAllocArray = Memory.alloc(64);
+                    //Memory.copy(newlyAllocArray, decodedPayload, 63);
+                    //args[1] = newlyAllocArray;
+                    args[1] = newlyAllocString;
+                }
             });
             userResponse.wait();
         }
@@ -198,22 +202,22 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             onEnter: function(args) {
                 var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
                 var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-                //console.log("Buffer before sending to Python: ");
-                //console.log(buf);
-                //console.log("done");
                 send(ruleAndLength, buf);
                 var userResponse = recv('input', function(value) {
-                    //args[1] = ptr(value.payload);
-                    //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
-                    console.log(value.payload);
-                    var decodedPayload = base64.decode(value.payload);
-                    console.log(decodedPayload);
-                    //var byteArray = new Uint8Array(1);
-                    newlyAllocString = Memory.allocUtf8String(decodedPayload);
-                    //newlyAllocArray = Memory.alloc(64);
-                    //Memory.copy(newlyAllocArray, decodedPayload, 63);
-                    //args[1] = newlyAllocArray;
-                    args[1] = newlyAllocString;
+                    console.log("WriteInterceptor: " + value.payload);
+                    if(value.payload != "DJP*NoEdit")
+                    {
+                        var decodedPayload = new ArrayBuffer;
+                        //decodedPayload = base64.decode(value.payload);
+                        //var byteArray = new Uint8Array();
+                        //newlyAllocString = Memory.allocUtf8String(decodedPayload);
+                        newlyAllocArray = Memory.alloc(64);
+                        arrayToWrite = new ArrayBuffer(64);
+                        //editedBufferInMemory = Memory.writeByteArray(newlyAllocArray, 0xFF);
+                        //Memory.copy(newlyAllocArray, decodedPayload, 63);
+                        //args[1] = newlyAllocArray;
+                        //args[1] = newlyAllocString;
+                    }
                 });
                 userResponse.wait();
             }
@@ -244,8 +248,8 @@ def on_message(message, data):
     currentFridaBufferId = fridaBufferId
     fridaBufferId += 1
     if data:
-        print(message['payload'])
-        print("RUNNING ON_MESSAGE")
+        #print(message['payload'])
+        #print("RUNNING ON_MESSAGE")
         print_bytes_for_ui(data)
         waiting[currentFridaBufferId] = None
         queueFridaBuffers.put((currentFridaBufferId, data))
@@ -261,6 +265,7 @@ def on_message(message, data):
             else:
                 queueUserInput.put((checkId, encodedBuffer))
                 time.sleep(1)
+                checkBuffers = False
         return 0
     else:
         print(message)
@@ -438,9 +443,8 @@ def main():
             if(willEdit == "y"):
                 encodedBuffer = make_buffer_from_file(edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer)))
                 queueUserInput.put((bufferId, encodedBuffer))
-        else:
-            pass
-
+            else:
+                queueUserInput.put((bufferId, "DJP*NoEdit"))
     exit(0)
 
 if __name__ == "__main__":
