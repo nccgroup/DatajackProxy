@@ -171,7 +171,7 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             //console.log("done");
             send(ruleAndLength, buf);
             var userResponse = recv('input', function(value) {
-                console.log("WriteInterceptor: " + value.payload);
+                //console.log("WriteInterceptor: " + value.payload);
                 if(value.payload != "DJP*NoEdit")
                 {
                     //args[1] = ptr(value.payload);
@@ -188,7 +188,7 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                 }
             });
             userResponse.wait();
-        }
+        } 
     });
     }
     catch(err)
@@ -201,25 +201,30 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         Interceptor.attach(ptr(functionPointer_LinuxSocket_read), {
             onEnter: function(args) {
                 var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-                var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-                send(ruleAndLength, buf);
-                var userResponse = recv('input', function(value) {
-                    console.log("WriteInterceptor: " + value.payload);
-                    if(value.payload != "DJP*NoEdit")
-                    {
-                        var decodedPayload = new ArrayBuffer;
-                        //decodedPayload = base64.decode(value.payload);
-                        //var byteArray = new Uint8Array();
-                        //newlyAllocString = Memory.allocUtf8String(decodedPayload);
-                        newlyAllocArray = Memory.alloc(64);
-                        arrayToWrite = new ArrayBuffer(64);
-                        //editedBufferInMemory = Memory.writeByteArray(newlyAllocArray, 0xFF);
-                        //Memory.copy(newlyAllocArray, decodedPayload, 63);
-                        //args[1] = newlyAllocArray;
-                        //args[1] = newlyAllocString;
-                    }
-                });
-                userResponse.wait();
+                // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
+                if(!Object.is(args[0].toInt32(), 1))
+                {
+                    // Check to make sure the write is not for a local type, to bypass printf and other writes to locals.
+                    var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
+                    send(ruleAndLength, buf);
+                    var userResponse = recv('input', function(value) {
+                        //console.log("WriteInterceptor: " + value.payload);
+                        if(value.payload != "DJP*NoEdit")
+                        {
+                            var decodedPayload = new ArrayBuffer;
+                            //decodedPayload = base64.decode(value.payload);
+                            //var byteArray = new Uint8Array();
+                            //newlyAllocString = Memory.allocUtf8String(decodedPayload);
+                            newlyAllocArray = Memory.alloc(64);
+                            arrayToWrite = new ArrayBuffer(64);
+                            //editedBufferInMemory = Memory.writeByteArray(newlyAllocArray, 0xFF);
+                            //Memory.copy(newlyAllocArray, decodedPayload, 63);
+                            //args[1] = newlyAllocArray;
+                            //args[1] = newlyAllocString;
+                        }
+                    });
+                    userResponse.wait();
+                }
             }
         });
         }
