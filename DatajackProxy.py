@@ -178,22 +178,13 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         onEnter: function(args) {
             var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
             var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-            //console.log("Buffer before sending to Python: ");
-            //console.log(buf);
-            //console.log("done");
             send(ruleAndLength, buf);
             var userResponse = recv('input', function(value) {
                 //console.log("WriteInterceptor: " + value.payload);
                 if(value.payload != "DJP*NoEdit")
                 {
-                    //args[1] = ptr(value.payload);
-                    //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
-                    //console.log(value.payload);
                     var decodedPayload = base64.decode(value.payload);
                     editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                    //console.log(typeof(editedBufferFromUser));
-                    //var byteArray = new Uint8Array(1);
-                    newlyAllocString = Memory.allocUtf8String(decodedPayload);
                     newlyAllocBuffer = Memory.alloc(decodedPayload.length);
                     Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
                     args[1] = newlyAllocBuffer;
@@ -216,21 +207,13 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                 // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
                 if(!Object.is(args[0].toInt32(), 1))
                 {
-                    // Check to make sure the write is not for a local type, to bypass printf and other writes to locals.
                     var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
                     send(ruleAndLength, buf);
                     var userResponse = recv('input', function(value) {
-                        //console.log("WriteInterceptor: " + value.payload);
                         if(value.payload != "DJP*NoEdit")
                         {
-                            //args[1] = ptr(value.payload);
-                            //TODO Update this function to decode the buffer, then put the buffer back in place of the openSSL argument.
-                            //console.log(value.payload);
                             var decodedPayload = base64.decode(value.payload);
                             editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                            //console.log(typeof(editedBufferFromUser));
-                            //var byteArray = new Uint8Array(1);
-                            newlyAllocString = Memory.allocUtf8String(decodedPayload);
                             newlyAllocBuffer = Memory.alloc(decodedPayload.length);
                             Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
                             args[1] = newlyAllocBuffer;
@@ -413,12 +396,9 @@ def edit_bytes_in_temp_file(byteString):
 def make_buffer_from_file(multiLineByteString):
     stringToEdit = "".join(multiLineByteString.splitlines()).replace(" ", "")
     newBuffer = codecs.decode(stringToEdit, "hex")
-    print(newBuffer)
     encodedBuffer = base64.b64encode(newBuffer)
     encodedBuffer = encodedBuffer.decode()
-    print(encodedBuffer)
     return(encodedBuffer)
-    #print(newBuffer)
 
 def read_byte_string(byteString):
     hex_list = byteString.split()
