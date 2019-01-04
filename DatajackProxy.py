@@ -180,7 +180,6 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
             send(ruleAndLength, buf);
             var userResponse = recv('input', function(value) {
-                //console.log("WriteInterceptor: " + value.payload);
                 if(value.payload != "DJP*NoEdit")
                 {
                     var decodedPayload = base64.decode(value.payload);
@@ -199,12 +198,11 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         try
         {
         functionPointer_LinuxSocket_write = Module.findExportByName(null, "write");
-        console.log("Interceptor running on socket.write()");
         Interceptor.attach(ptr(functionPointer_LinuxSocket_write), {
             onEnter: function(args) {
                 var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
                 // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
-                if(!Object.is(args[0].toInt32(), 1))
+                if(Object.is(args[0].toInt32(), 3))
                 {
                     var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
                     send(ruleAndLength, buf);
@@ -214,8 +212,6 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                             var decodedPayload = base64.decode(value.payload);
                             editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                             newlyAllocBuffer = Memory.alloc(decodedPayload.length);
-                            console.log(typeof(editedBufferFromUser));
-                            console.log(editedBufferFromUser);
                             Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
                             args[1] = newlyAllocBuffer;
                         }
@@ -233,19 +229,16 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
 
     try
     {
-        functionPointer_socket_read = Module.findExportByName(null, "read");
-        Interceptor.attach(ptr(functionPointer_socket_read), {
+        functionPointer_openSSL_SSL_read = Module.findExportByName(null, "SSL_read");
+        Interceptor.attach(ptr(functionPointer_openSSL_SSL_read), {
             onEnter: function(args) {
-                //asdf
-                console.log("Started socket.read onEnter");
-                this.domainNumber = args[0].toInt32();
+                //this.domainNumber = args[0].toInt32();
                 this.bufPointer = args[1];
                 this.bufLength = args[2].toInt32();
             },
             onLeave: function (result) {
-                //console.log('started socket.read onLeave');
-                if(this.domainNumber == 3)
-                {
+                //if(this.domainNumber == 3)
+                //{
                     this.ruleAndLength = "Client --> Server, " + this.bufLength.toString() + " byte message.";
                     this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
                     var originalBufferPointer = this.bufPointer;
@@ -257,19 +250,47 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                             editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                             Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
                         }
-                        else
-                        {
-                            console.log("socket.read onLeave: NoEdit branch");
-                        }
                     });
                     this.userResponse.wait();
-                }
+                //}
             }
         });
     }
     catch(err)
     {
-        console.log("Ran into socket.read Catch");
+        try
+        {
+            functionPointer_socket_read = Module.findExportByName(null, "read");
+            Interceptor.attach(ptr(functionPointer_socket_read), {
+                onEnter: function(args) {
+                    this.domainNumber = args[0].toInt32();
+                    this.bufPointer = args[1];
+                    this.bufLength = args[2].toInt32();
+                },
+                onLeave: function (result) {
+                    if(this.domainNumber == 3)
+                    {
+                        this.ruleAndLength = "Client --> Server, " + this.bufLength.toString() + " byte message.";
+                        this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
+                        var originalBufferPointer = this.bufPointer;
+                        send(this.ruleAndLength, this.buf_LinuxSocket_read);
+                        this.userResponse = recv('input', function(value) {
+                            if(value.payload != "DJP*NoEdit")
+                            {
+                                decodedPayload = base64.decode(value.payload);
+                                editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                                Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
+                            }
+                        });
+                        this.userResponse.wait();
+                    }
+                }
+            });
+        }
+        catch(err)
+        {
+            console.log("Ran into socket.read Catch");
+        }
     }
 
 
@@ -291,20 +312,13 @@ def on_message(message, data):
     currentFridaBufferId = fridaBufferId
     fridaBufferId += 1
     if data:
-        #print(message['payload'])
-        #print("RUNNING ON_MESSAGE")
         print_bytes_for_ui(data)
         waiting[currentFridaBufferId] = None
         queueFridaBuffers.put((currentFridaBufferId, data))
-        #while(waiting[currentFridaBufferId] is None):
-        #   time.sleep(1)
-        #new_data = waiting[currentFridaBufferId]
-        #del waiting[currentFridaBufferId]
         while(checkBuffers):
             checkId, encodedBuffer = queueUserInput.get()
             if(checkId is currentFridaBufferId):
                 checkBuffers = False
-                print("EncodedBuffer: " + encodedBuffer)
                 script.post({'type': 'input', 'payload': encodedBuffer})
             else:
                 queueUserInput.put((checkId, encodedBuffer))
@@ -333,9 +347,7 @@ def select_os(osSelection):
     return(osSelection)
 
 def user_input_thread(queueFridaBuffers, queueUserInput):
-    print("[*] Starting user_input_thread")
     while True:
-        print("[*] In user input loop")
         if queueUserInput.empty():
             willEdit = will_user_edit()
             #queueUserInput.put(willEdit)
@@ -371,7 +383,6 @@ def bytes_to_string(inBytes):
     return resp
 
 def will_user_edit():
-    print("[*] Starting will_user_edit")
     print("Edit Packet? Y/n")
     userInput = input()
     if(userInput.lower() == "n" or userInput.lower() == "no"):
@@ -448,8 +459,6 @@ def read_byte_string(byteString):
     return bytes([int(x, 16) for x in hex_list])
 
 def main():
-    print("[*] Starting MAIN")
-
     # Default to Linux OS
     os = 'linux'
     hasUserGivenInput = False
