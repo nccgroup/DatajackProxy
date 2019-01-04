@@ -196,12 +196,11 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
     }
     catch(err)
     {
-        console.log("Couldn't find openSSL ssl_write, trying regular sockets");
-
         try
         {
-        functionPointer_LinuxSocket_read = Module.findExportByName(null, "write");
-        Interceptor.attach(ptr(functionPointer_LinuxSocket_read), {
+        functionPointer_LinuxSocket_write = Module.findExportByName(null, "write");
+        console.log("Interceptor running on socket.write()");
+        Interceptor.attach(ptr(functionPointer_LinuxSocket_write), {
             onEnter: function(args) {
                 var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
                 // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
@@ -215,6 +214,8 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                             var decodedPayload = base64.decode(value.payload);
                             editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                             newlyAllocBuffer = Memory.alloc(decodedPayload.length);
+                            console.log(typeof(editedBufferFromUser));
+                            console.log(editedBufferFromUser);
                             Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
                             args[1] = newlyAllocBuffer;
                         }
@@ -228,6 +229,47 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         {
             console.log("Couldn't find socket write");
         }
+    }
+
+    try
+    {
+        functionPointer_socket_read = Module.findExportByName(null, "read");
+        Interceptor.attach(ptr(functionPointer_socket_read), {
+            onEnter: function(args) {
+                //asdf
+                console.log("Started socket.read onEnter");
+                this.domainNumber = args[0].toInt32();
+                this.bufPointer = args[1];
+                this.bufLength = args[2].toInt32();
+            },
+            onLeave: function (result) {
+                //console.log('started socket.read onLeave');
+                if(this.domainNumber == 3)
+                {
+                    this.ruleAndLength = "Client --> Server, " + this.bufLength.toString() + " byte message.";
+                    this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
+                    var originalBufferPointer = this.bufPointer;
+                    send(this.ruleAndLength, this.buf_LinuxSocket_read);
+                    this.userResponse = recv('input', function(value) {
+                        if(value.payload != "DJP*NoEdit")
+                        {
+                            decodedPayload = base64.decode(value.payload);
+                            editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                            Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
+                        }
+                        else
+                        {
+                            console.log("socket.read onLeave: NoEdit branch");
+                        }
+                    });
+                    this.userResponse.wait();
+                }
+            }
+        });
+    }
+    catch(err)
+    {
+        console.log("Ran into socket.read Catch");
     }
 
 
@@ -262,6 +304,7 @@ def on_message(message, data):
             checkId, encodedBuffer = queueUserInput.get()
             if(checkId is currentFridaBufferId):
                 checkBuffers = False
+                print("EncodedBuffer: " + encodedBuffer)
                 script.post({'type': 'input', 'payload': encodedBuffer})
             else:
                 queueUserInput.put((checkId, encodedBuffer))
