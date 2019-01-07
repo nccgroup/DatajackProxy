@@ -239,7 +239,7 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             onLeave: function (result) {
                 //if(this.domainNumber == 3)
                 //{
-                    this.ruleAndLength = "Client --> Server, " + this.bufLength.toString() + " byte message.";
+                    this.ruleAndLength = "Server --> Client, " + this.bufLength.toString() + " byte message.";
                     this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
                     var originalBufferPointer = this.bufPointer;
                     send(this.ruleAndLength, this.buf_LinuxSocket_read);
@@ -270,7 +270,7 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                 onLeave: function (result) {
                     if(this.domainNumber == 3)
                     {
-                        this.ruleAndLength = "Client --> Server, " + this.bufLength.toString() + " byte message.";
+                        this.ruleAndLength = "Server --> Client, " + this.bufLength.toString() + " byte message.";
                         this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
                         var originalBufferPointer = this.bufPointer;
                         send(this.ruleAndLength, this.buf_LinuxSocket_read);
@@ -312,6 +312,7 @@ def on_message(message, data):
     currentFridaBufferId = fridaBufferId
     fridaBufferId += 1
     if data:
+        print(message['payload'])
         print_bytes_for_ui(data)
         waiting[currentFridaBufferId] = None
         queueFridaBuffers.put((currentFridaBufferId, data))
