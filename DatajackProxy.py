@@ -171,59 +171,65 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         return bufferToReturn;
     }
 
+
     try 
     {
-    functionPointer_OpenSSL_SSL_write = Module.findExportByName(null, "SSL_write");
-    Interceptor.attach(ptr(functionPointer_OpenSSL_SSL_write), {
-        onEnter: function(args) {
-            var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-            var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-            send(ruleAndLength, buf);
-            var userResponse = recv('input', function(value) {
-                if(value.payload != "DJP*NoEdit")
-                {
-                    var decodedPayload = base64.decode(value.payload);
-                    editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                    newlyAllocBuffer = Memory.alloc(decodedPayload.length);
-                    Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
-                    args[1] = newlyAllocBuffer;
-                }
-            });
-            userResponse.wait();
-        } 
-    });
+        functionPointer_OpenSSL_SSL_write = Module.findExportByName(null, "SSL_write");
+        Interceptor.attach(ptr(functionPointer_OpenSSL_SSL_write), {
+            onEnter: function(args) {
+                var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
+                var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
+                send(ruleAndLength, buf);
+                var userResponse = recv('input', function(value) {
+                    if(value.payload != "DJP*NoEdit")
+                    {
+                        var decodedPayload = base64.decode(value.payload);
+                        editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                        newlyAllocBuffer = Memory.alloc(decodedPayload.length);
+                        Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                        args[1] = newlyAllocBuffer;
+                    }
+                });
+                userResponse.wait();
+            } 
+        });
     }
     catch(err)
     {
+        
+    }
+
+    if (!functionPointer_OpenSSL_SSL_write)
+    {
         try
         {
-        functionPointer_LinuxSocket_write = Module.findExportByName(null, "write");
-        Interceptor.attach(ptr(functionPointer_LinuxSocket_write), {
-            onEnter: function(args) {
-                var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-                // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
-                if(Object.is(args[0].toInt32(), 3))
-                {
-                    var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-                    send(ruleAndLength, buf);
-                    var userResponse = recv('input', function(value) {
-                        if(value.payload != "DJP*NoEdit")
-                        {
-                            var decodedPayload = base64.decode(value.payload);
-                            editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                            newlyAllocBuffer = Memory.alloc(decodedPayload.length);
-                            Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
-                            args[1] = newlyAllocBuffer;
-                        }
-                    });
-                    userResponse.wait();
+            functionPointer_LinuxSocket_write = Module.findExportByName(null, "write");
+            Interceptor.attach(ptr(functionPointer_LinuxSocket_write), {
+                onEnter: function(args) {
+                    var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
+                    // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
+                    if(Object.is(args[0].toInt32(), 3))
+                    {
+                        var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
+                        send(ruleAndLength, buf);
+                        var userResponse = recv('input', function(value) {
+                            if(value.payload != "DJP*NoEdit")
+                            {
+                                var decodedPayload = base64.decode(value.payload);
+                                editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                                newlyAllocBuffer = Memory.alloc(decodedPayload.length);
+                                Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                                args[1] = newlyAllocBuffer;
+                            }
+                        });
+                        userResponse.wait();
+                    }
                 }
-            }
-        });
+            });
         }
         catch(err)
         {
-            console.log("Couldn't find socket write");
+
         }
     }
 
@@ -258,6 +264,11 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
     }
     catch(err)
     {
+        
+    }
+
+    if (!functionPointer_openSSL_SSL_read)
+    {
         try
         {
             functionPointer_socket_read = Module.findExportByName(null, "read");
@@ -289,11 +300,9 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
         }
         catch(err)
         {
-            console.log("Ran into socket.read Catch");
+
         }
     }
-
-
     """)
     script.on('message', on_message)
     script.load()
