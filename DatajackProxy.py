@@ -27,7 +27,6 @@ num_threads = 2
 def attach(queueFridaBuffers, queueUserInput, processToAttach):
     mythread = threading.currentThread()
     print("[*] Attaching to " + str(processToAttach))
-    #print("[FridaThread]", mythread.getName(), ":", "blarg")
     session = frida.attach(processToAttach)
 
     global script
@@ -187,6 +186,8 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                         editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                         newlyAllocBuffer = Memory.alloc(decodedPayload.length);
                         Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                        newArgLength = new Int64(decodedPayload.length);
+                        args[2] = ptr(newArgLength);
                         args[1] = newlyAllocBuffer;
                     }
                 });
@@ -219,6 +220,8 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                                 editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                                 newlyAllocBuffer = Memory.alloc(decodedPayload.length);
                                 Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                                newArgLength = new Int64(decodedPayload.length);
+                                args[2] = ptr(newArgLength);
                                 args[1] = newlyAllocBuffer;
                             }
                         });
