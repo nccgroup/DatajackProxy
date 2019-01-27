@@ -248,14 +248,20 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
             onLeave: function (result) {
                 //if(this.domainNumber == 3)
                 //{
-                    this.ruleAndLength = "Server --> Client, " + this.bufLength.toString() + " byte message.";
-                    this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
+                    originalBufferLength = this.bufLength;
+                    this.ruleAndLength = "Server --> Client, " + originalBufferLength.toString() + " byte message.";
+                    this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), originalBufferLength);
                     var originalBufferPointer = this.bufPointer;
                     send(this.ruleAndLength, this.buf_LinuxSocket_read);
                     this.userResponse = recv('input', function(value) {
                         if(value.payload != "DJP*NoEdit")
                         {
                             decodedPayload = base64.decode(value.payload);
+                            if(decodedPayload.length > originalBufferLength)
+                            {
+                                console.log("Read call edits cannot be longer than original buffer. Truncated to " + originalBufferLength + " bytes.");
+                                decodedPayload = decodedPayload.substring(0, originalBufferLength);
+                            }
                             editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                             Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
                         }
@@ -284,14 +290,20 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach):
                 onLeave: function (result) {
                     if(this.domainNumber == 3)
                     {
-                        this.ruleAndLength = "Server --> Client, " + this.bufLength.toString() + " byte message.";
-                        this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), this.bufLength);
+                        originalBufferLength = this.bufLength;
+                        this.ruleAndLength = "Server --> Client, " + originalBufferLength.toString() + " byte message.";
+                        this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), originalBufferLength);
                         var originalBufferPointer = this.bufPointer;
                         send(this.ruleAndLength, this.buf_LinuxSocket_read);
                         this.userResponse = recv('input', function(value) {
                             if(value.payload != "DJP*NoEdit")
                             {
                                 decodedPayload = base64.decode(value.payload);
+                                if(decodedPayload.length > originalBufferLength)
+                                {
+                                    console.log("Read call edits cannot be longer than original buffer. Truncated to " + originalBufferLength + " bytes.");
+                                    decodedPayload = decodedPayload.substring(0, originalBufferLength);
+                                }
                                 editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
                                 Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
                             }
