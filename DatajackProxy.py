@@ -51,7 +51,7 @@ def attach(queueFridaBuffers, queueUserInput, processToAttach, osSelection):
         close("Only Linux and Windows supported")
 
 
-    print(scriptText)
+    #print(scriptText)
 
     script = session.create_script(scriptText)
 
