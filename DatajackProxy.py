@@ -24,301 +24,37 @@ queueFridaBuffers = Queue(maxsize=0)
 queueUserInput = Queue(maxsize=0)
 num_threads = 2
 
-def attach(queueFridaBuffers, queueUserInput, processToAttach):
+def attach(queueFridaBuffers, queueUserInput, processToAttach, osSelection):
     mythread = threading.currentThread()
     print("[*] Attaching to " + str(processToAttach))
     session = frida.attach(processToAttach)
 
     global script
 
-    script = session.create_script("""
-    
-    ;(function(root) {
-    var freeExports = typeof exports == 'object' && exports;
-    var freeModule = typeof module == 'object' && module &&
-        module.exports == freeExports && module;
-    var freeGlobal = typeof global == 'object' && global;
-    if (freeGlobal.global === freeGlobal || freeGlobal.window === freeGlobal) {
-        root = freeGlobal;
-    }
-    var InvalidCharacterError = function(message) {
-        this.message = message;
-    };
-    InvalidCharacterError.prototype = new Error;
-    InvalidCharacterError.prototype.name = 'InvalidCharacterError';
-    var error = function(message) {
-        throw new InvalidCharacterError(message);
-    };
-    var TABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    var REGEX_SPACE_CHARACTERS = /[\\t\\n\\f\\r ]/g;
-    var decode = function(input) {
-        input = String(input)
-            .replace(REGEX_SPACE_CHARACTERS, '');
-        var length = input.length;
-        if (length % 4 == 0) {
-            input = input.replace(/==?$/, '');
-            length = input.length;
-        }
-        if (
-            length % 4 == 1 ||
-            /[^+a-zA-Z0-9/]/.test(input)
-        ) {
-            error(
-                'Invalid character: the string to be decoded is not correctly encoded.'
-            );
-        }
-        var bitCounter = 0;
-        var bitStorage;
-        var buffer;
-        var output = '';
-        var position = -1;
-        while (++position < length) {
-            buffer = TABLE.indexOf(input.charAt(position));
-            bitStorage = bitCounter % 4 ? bitStorage * 64 + buffer : buffer;
-            if (bitCounter++ % 4) {
-                output += String.fromCharCode(
-                    0xFF & bitStorage >> (-2 * bitCounter & 6)
-                );
-            }
-        }
-        return output;
-    };
-    var encode = function(input) {
-        input = String(input);
-        if (/[^\\0-\\xFF]/.test(input)) {
-            error(
-                'The string to be encoded contains characters outside of the ' +
-                'Latin1 range.'
-            );
-        }
-        var padding = input.length % 3;
-        var output = '';
-        var position = -1;
-        var a;
-        var b;
-        var c;
-        var d;
-        var buffer;
-        var length = input.length - padding;
-        while (++position < length) {
-            a = input.charCodeAt(position) << 16;
-            b = input.charCodeAt(++position) << 8;
-            c = input.charCodeAt(++position);
-            buffer = a + b + c;
-            output += (
-                TABLE.charAt(buffer >> 18 & 0x3F) +
-                TABLE.charAt(buffer >> 12 & 0x3F) +
-                TABLE.charAt(buffer >> 6 & 0x3F) +
-                TABLE.charAt(buffer & 0x3F)
-            );
-        }
-        if (padding == 2) {
-            a = input.charCodeAt(position) << 8;
-            b = input.charCodeAt(++position);
-            buffer = a + b;
-            output += (
-                TABLE.charAt(buffer >> 10) +
-                TABLE.charAt((buffer >> 4) & 0x3F) +
-                TABLE.charAt((buffer << 2) & 0x3F) +
-                '='
-            );
-        } else if (padding == 1) {
-            buffer = input.charCodeAt(position);
-            output += (
-                TABLE.charAt(buffer >> 2) +
-                TABLE.charAt((buffer << 4) & 0x3F) +
-                '=='
-            );
-        }
-        return output;
-    };
-    var base64 = {
-        'encode': encode,
-        'decode': decode,
-        'version': '0.1.0'
-    };
-    if (
-        typeof define == 'function' &&
-        typeof define.amd == 'object' &&
-        define.amd
-    ) {
-        define(function() {
-            return base64;
-        });
-    }   else if (freeExports && !freeExports.nodeType) {
-        if (freeModule) { // in Node.js or RingoJS v0.8.0+
-            freeModule.exports = base64;
-        } else { // in Narwhal or RingoJS v0.7.0-
-            for (var key in base64) {
-                base64.hasOwnProperty(key) && (freeExports[key] = base64[key]);
-            }
-        }
-    } else { // in Rhino or a web browser
-        root.base64 = base64;
-    }
-    }(this));
+    scriptText = ""
 
-    function decodedStringToArrayBuffer(decodedString)
-    {
-        var bufferToReturn = new ArrayBuffer(decodedString.length);
-        var bufferToReturnView = new Uint8Array(bufferToReturn);
-        for (i = 0; i < decodedString.length; i++)
-        {
-            bufferToReturnView[i] = decodedString.charCodeAt(i);
-        }
+    if osSelection in ['win32']:
+        scriptFiles = ['base64.js', 'decodedStringToArrayBuffer.js', 'windowsSchannel.js']
 
-        return bufferToReturn;
-    }
+        for fileName in scriptFiles:
+            with open("InjectableScripts\\" + fileName) as scriptFile:
+                scriptText = scriptText + scriptFile.read()
+
+    elif osSelection in ['linux']:
+        scriptFiles = ['base64.js', 'decodedStringToArrayBuffer.js', 'linuxOpenSSLAndSocketWrite.js']
+
+        for fileName in scriptFiles:
+            with open("InjectableScripts/" + fileName) as scriptFile:
+                scriptText = scriptText + scriptFile.read()
+
+    else:
+        close("Only Linux and Windows supported")
 
 
-    try 
-    {
-        functionPointer_OpenSSL_SSL_write = Module.findExportByName(null, "SSL_write");
-        Interceptor.attach(ptr(functionPointer_OpenSSL_SSL_write), {
-            onEnter: function(args) {
-                var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-                var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-                send(ruleAndLength, buf);
-                var userResponse = recv('input', function(value) {
-                    if(value.payload != "DJP*NoEdit")
-                    {
-                        var decodedPayload = base64.decode(value.payload);
-                        editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                        newlyAllocBuffer = Memory.alloc(decodedPayload.length);
-                        Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
-                        newArgLength = new Int64(decodedPayload.length);
-                        args[2] = ptr(newArgLength);
-                        args[1] = newlyAllocBuffer;
-                    }
-                });
-                userResponse.wait();
-            } 
-        });
-    }
-    catch(err)
-    {
-        
-    }
+    #print(scriptText)
 
-    if (!functionPointer_OpenSSL_SSL_write)
-    {
-        try
-        {
-            functionPointer_LinuxSocket_write = Module.findExportByName(null, "write");
-            Interceptor.attach(ptr(functionPointer_LinuxSocket_write), {
-                onEnter: function(args) {
-                    var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
-                    // Check args[0] to ensure it is not a "1", which is the argument for local sockets, rather than network sockets (which are 3).
-                    if(Object.is(args[0].toInt32(), 3))
-                    {
-                        var ruleAndLength = "Client --> Server, " + args[2].toInt32().toString() + " byte message.";
-                        send(ruleAndLength, buf);
-                        var userResponse = recv('input', function(value) {
-                            if(value.payload != "DJP*NoEdit")
-                            {
-                                var decodedPayload = base64.decode(value.payload);
-                                editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                                newlyAllocBuffer = Memory.alloc(decodedPayload.length);
-                                Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
-                                newArgLength = new Int64(decodedPayload.length);
-                                args[2] = ptr(newArgLength);
-                                args[1] = newlyAllocBuffer;
-                            }
-                        });
-                        userResponse.wait();
-                    }
-                }
-            });
-        }
-        catch(err)
-        {
+    script = session.create_script(scriptText)
 
-        }
-    }
-
-    try
-    {
-        functionPointer_openSSL_SSL_read = Module.findExportByName(null, "SSL_read");
-        Interceptor.attach(ptr(functionPointer_openSSL_SSL_read), {
-            onEnter: function(args) {
-                //this.domainNumber = args[0].toInt32();
-                this.bufPointer = args[1];
-                this.bufLength = args[2].toInt32();
-            },
-            onLeave: function (result) {
-                //if(this.domainNumber == 3)
-                //{
-                    originalBufferLength = this.bufLength;
-                    this.ruleAndLength = "Server --> Client, " + originalBufferLength.toString() + " byte message.";
-                    this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), originalBufferLength);
-                    var originalBufferPointer = this.bufPointer;
-                    send(this.ruleAndLength, this.buf_LinuxSocket_read);
-                    this.userResponse = recv('input', function(value) {
-                        if(value.payload != "DJP*NoEdit")
-                        {
-                            decodedPayload = base64.decode(value.payload);
-                            if(decodedPayload.length > originalBufferLength)
-                            {
-                                console.log("Read call edits cannot be longer than original buffer. Truncated to " + originalBufferLength + " bytes.");
-                                decodedPayload = decodedPayload.substring(0, originalBufferLength);
-                            }
-                            editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                            Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
-                        }
-                    });
-                    this.userResponse.wait();
-                //}
-            }
-        });
-    }
-    catch(err)
-    {
-        
-    }
-
-    if (!functionPointer_openSSL_SSL_read)
-    {
-        try
-        {
-            functionPointer_socket_read = Module.findExportByName(null, "read");
-            Interceptor.attach(ptr(functionPointer_socket_read), {
-                onEnter: function(args) {
-                    this.domainNumber = args[0].toInt32();
-                    this.bufPointer = args[1];
-                    this.bufLength = args[2].toInt32();
-                },
-                onLeave: function (result) {
-                    if(this.domainNumber == 3)
-                    {
-                        originalBufferLength = this.bufLength;
-                        this.ruleAndLength = "Server --> Client, " + originalBufferLength.toString() + " byte message.";
-                        this.buf_LinuxSocket_read = Memory.readByteArray(ptr(this.bufPointer), originalBufferLength);
-                        var originalBufferPointer = this.bufPointer;
-                        send(this.ruleAndLength, this.buf_LinuxSocket_read);
-                        this.userResponse = recv('input', function(value) {
-                            if(value.payload != "DJP*NoEdit")
-                            {
-                                decodedPayload = base64.decode(value.payload);
-                                if(decodedPayload.length > originalBufferLength)
-                                {
-                                    console.log("Read call edits cannot be longer than original buffer. Truncated to " + originalBufferLength + " bytes.");
-                                    decodedPayload = decodedPayload.substring(0, originalBufferLength);
-                                }
-                                editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
-                                Memory.writeByteArray(ptr(originalBufferPointer), editedBufferFromUser);
-                            }
-                        });
-                        this.userResponse.wait();
-                    }
-                }
-            });
-        }
-        catch(err)
-        {
-
-        }
-    }
-    """)
     script.on('message', on_message)
     script.load()
     while block:
@@ -502,9 +238,9 @@ def main():
         os = select_os("determine")
 
     if(args.pid):
-        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.pid))
+        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.pid, os))
     elif(args.name):
-        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.name))
+        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.name, os))
     else:
         exit("Please provide either a PID (-p) or process name (-n)")
 
