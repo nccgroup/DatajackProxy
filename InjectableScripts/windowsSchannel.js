@@ -15,9 +15,38 @@ try
 
                         //Read the cBuffers (count of buffers) from the SecBufferDesc struct. This has always been a 32-bit unsigned Long so far as I've seen. This is the number of buffers (messages) that are to be encrypted.
                         this.long_cBuffers_SecBufferDesc = Memory.readULong(ptr(this.pMessage.toInt32() + 4));
-                        //this.ruleAndLength = "Client --> Server, X byte message.";
-                        this.ruleAndLength = "Client --> Server, " + this.long_cBuffers_SecBufferDesc + " byte message.";
-                        send(this.ruleAndLength, this.struct_pMessage_SecBufferDesc);
+
+                        this.pointer_pBuffers = Memory.readPointer(ptr(this.pMessage.toInt32() + 8));
+
+                        for (i = 0; i < this.long_cBuffers_SecBufferDesc; i++)
+                        {
+                            this.data_pvBuffer = Memory.readByteArray(ptr(this.pointer_pBuffers.toInt32() + (i * 12) + 8), Memory.readULong(ptr(this.pointer_pBuffers.toInt32() + (i * 12))));
+
+                            this.ruleAndLength = "Client --> Server, Message " + (i + 1) + " of " + this.long_cBuffers_SecBufferDesc + ", " + Memory.readULong(ptr(this.pointer_pBuffers.toInt32() + (i * 12))) + " byte message.";
+
+                            send(this.ruleAndLength, this.data_pvBuffer);
+
+                            var userResponse = recv('input', function(value) {
+                            if(value.payload != "DJP*NoEdit")
+                            {
+                                var decodedPayload = base64.decode(value.payload);
+                                editedBufferFromUser = decodedStringToArrayBuffer(decodedPayload);
+                                newlyAllocBuffer = Memory.alloc(decodedPayload.length);
+                                Memory.writeByteArray(newlyAllocBuffer, editedBufferFromUser);
+                                newArgLength = new Int64(decodedPayload.length);
+
+                                Memory.writeULong((ptr(this.pointer_pBuffers.toInt32() + (i * 12))), newArgLength);
+                                Memory.writePointer(ptr(this.pointer_pBuffers.toInt32() + (i * 12) + 8), newlyAllocBuffer);
+
+                                args[2] = ptr(newArgLength);
+                                args[1] = newlyAllocBuffer;
+                            }
+                        
+                        console.log("Entered EncryptMessage!");
+                        });
+                        userResponse.wait();
+                        }
+
                     }
                     /*    
                     var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
