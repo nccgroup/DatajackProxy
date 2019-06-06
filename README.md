@@ -5,21 +5,12 @@ This is accomplished by injecting JavaScript into the native process using the [
 
 ## Features
 * Inject into process
-  * Linux (using OpenSSL)
-    *kTLS in Linux 4.13+ (TODO)
-  * MacOS (TODO)
-  * Windows (schannel) (TODO)
-  * iOS (TODO)
-  * Android (TODO)
-* Read data prior to outbound encryption
-* Write data prior to outbound encryption (TODO)
-* Read data after inbound decryption (TODO)
-* Write data after inbound decryption (TODO)
-* Allow user-defined rules (TODO)
-* Allow configuration file for capture rules (TODO)
-* File-based traffic capture, edit, and replay (TODO)
-* GUI (TODO)
+  * Linux (Using OpenSSL SSL_Read and SSL_Write)
+  * Windows (Using schannel EncryptMessage [DecryptMessage todo])
+* Read/write data prior to outbound encryption (Linux and Windows)
+* Read/write data after inbound decryption (Linux works, Windows todo)
 
+Note: Currently only Linux and Windows are supported. Linux supports the OpenSSL calls SSL_Write and SSL_Read
 
 ## Usage
 **Help**
@@ -35,6 +26,10 @@ Attach to existing process `<pid>`
 Attach to existing process with name `<processName>`
 
 `python DatajackProxy.py -n <processName>`
+
+Attach to Windows process with name `OUTLOOK.EXE`
+
+`python DatajackProxy.py -n OUTLOOK.EXE -o windows`
 
 ## Requirements and Installation
 * Python 3

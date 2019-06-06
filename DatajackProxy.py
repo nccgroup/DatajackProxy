@@ -5,7 +5,7 @@ from queue import *
 from threading import Thread
 import threading
 from tempfile import mkstemp
-#import tempfile
+import tempfile
 import time
 import sys
 import frida
@@ -176,17 +176,21 @@ def make_bytes_for_temp_file(inBytes, length=16):
     output += blockOfHexBytes + appendOldBytes + "[*] ASCII was:\n" + readable
     return(output)
 
-def edit_bytes_in_temp_file(byteString):
+def edit_bytes_in_temp_file(byteString, userOs):
     bytesFromFile = byteString
     try:
         editor = os.getenv("EDITOR")
         if editor:
-            print(editor)
+            print("DEBUG!!!!!!!!" + editor)
         else:
             editor = 'vim'
     finally:
         pass
 
+    '''if(userOs == 'win32'):
+
+        editProc = subprocess.Popen(['start', tempFilePath], shell=True)
+    else:'''
     tempFileDescriptor, tempFilePath = mkstemp(text=True)
     try:
         with os.fdopen(tempFileDescriptor, 'r+') as tmp:
@@ -194,7 +198,8 @@ def edit_bytes_in_temp_file(byteString):
             tmp.flush()
             os.fsync(tmp.fileno())
             #TODO: Make the arguments work for editors other than Vim
-            editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
+            editProc = subprocess.Popen(['notepad', tempFilePath])
+            #editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
             editProc.communicate()
             bytesFromFile = ""
             tmp.seek(0)
@@ -221,7 +226,7 @@ def read_byte_string(byteString):
 
 def main():
     # Default to Linux OS
-    os = 'linux'
+    userOs = 'linux'
     hasUserGivenInput = False
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--os", help="Set OS to either 'linux', 'windows', or 'mac'", type=str, choices=["linux", "windows", "mac"])
@@ -233,14 +238,14 @@ def main():
 
     # Select OS
     if(args.os):
-        os = select_os(args.os)
+        userOs = select_os(args.os)
     else:
-        os = select_os("determine")
+        userOs = select_os("determine")
 
     if(args.pid):
-        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.pid, os))
+        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.pid, userOs))
     elif(args.name):
-        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.name, os))
+        fridaThread = Thread(target=attach, args=(queueFridaBuffers, queueUserInput, args.name, userOs))
     else:
         exit("Please provide either a PID (-p) or process name (-n)")
 
@@ -252,7 +257,7 @@ def main():
             bufferId, fridaBuffer = queueFridaBuffers.get()
             willEdit = will_user_edit()
             if(willEdit == "y"):
-                encodedBuffer = make_buffer_from_file(edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer)))
+                encodedBuffer = make_buffer_from_file(edit_bytes_in_temp_file(make_bytes_for_temp_file(fridaBuffer), userOs))
                 queueUserInput.put((bufferId, encodedBuffer))
             else:
                 queueUserInput.put((bufferId, "DJP*NoEdit"))
