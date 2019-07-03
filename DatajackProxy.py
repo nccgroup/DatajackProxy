@@ -198,8 +198,10 @@ def edit_bytes_in_temp_file(byteString, userOs):
             tmp.flush()
             os.fsync(tmp.fileno())
             #TODO: Make the arguments work for editors other than Vim
-            editProc = subprocess.Popen(['notepad', tempFilePath])
-            #editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
+            if (userOs == 'win32'):
+                editProc = subprocess.Popen(['notepad', tempFilePath])
+            else:
+                editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
             editProc.communicate()
             bytesFromFile = ""
             tmp.seek(0)
