@@ -1,6 +1,7 @@
 try 
         {
             functionPointer_OpenSSL_SSL_write = Module.findExportByName(null, "SSL_write");
+            console.log("[injectable-linuxOpenSSLAndSocketWrite] Hooked function 'SSL_write'");
             Interceptor.attach(ptr(functionPointer_OpenSSL_SSL_write), {
                 onEnter: function(args) {
                     var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
@@ -24,7 +25,7 @@ try
         }
         catch(err)
         {
-            
+            console.log("[injectable-linuxOpenSSLAndSocketWrite] Could not find function 'SSL_write'");
         }
 
         if (!functionPointer_OpenSSL_SSL_write)
@@ -32,6 +33,7 @@ try
             try
             {
                 functionPointer_LinuxSocket_write = Module.findExportByName(null, "write");
+                console.log("[injectable-linuxOpenSSLAndSocketWrite] Hooked function 'write'");
                 Interceptor.attach(ptr(functionPointer_LinuxSocket_write), {
                     onEnter: function(args) {
                         var buf = Memory.readByteArray(ptr(args[1]), args[2].toInt32());
@@ -59,13 +61,14 @@ try
             }
             catch(err)
             {
-
+                console.log("[injectable-linuxOpenSSLAndSocketWrite] Could not find function 'write'");
             }
         }
 
         try
         {
             functionPointer_openSSL_SSL_read = Module.findExportByName(null, "SSL_read");
+            console.log("[injectable-linuxOpenSSLAndSocketWrite] Hooked function 'SSL_read'");
             Interceptor.attach(ptr(functionPointer_openSSL_SSL_read), {
                 onEnter: function(args) {
                     //this.domainNumber = args[0].toInt32();
@@ -100,7 +103,7 @@ try
         }
         catch(err)
         {
-            
+            console.log("[injectable-linuxOpenSSLAndSocketWrite] Could not find function 'SSL_read'");
         }
 
         if (!functionPointer_openSSL_SSL_read)
@@ -108,6 +111,7 @@ try
             try
             {
                 functionPointer_socket_read = Module.findExportByName(null, "read");
+                console.log("[injectable-linuxOpenSSLAndSocketWrite] Hooked function 'read'");
                 Interceptor.attach(ptr(functionPointer_socket_read), {
                     onEnter: function(args) {
                         this.domainNumber = args[0].toInt32();
@@ -142,7 +146,7 @@ try
             }
             catch(err)
             {
-
+                console.log("[injectable-linuxOpenSSLAndSocketWrite] Could not find function 'read'");
             }
         }
         

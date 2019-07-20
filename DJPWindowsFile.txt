@@ -1,0 +1,13 @@
+62
+[*] Edit hex above. Save and quit to make changes.
+[*] Original bytes were:
+62
+[*] ASCII was:
+bl bytes were:
+70 f7 98 00 01 00 00 00 01 00 00 00 08
+[*] ASCII was:
+p............ 16
+40 00 00 00 06
+[*] ASCII was:
+.o...........o..
+@....
