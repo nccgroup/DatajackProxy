@@ -192,24 +192,43 @@ def edit_bytes_in_temp_file(byteString, userOs):
         editProc = subprocess.Popen(['start', tempFilePath], shell=True)
     else:'''
     tempFileDescriptor, tempFilePath = mkstemp(text=True)
-    try:
-        with os.fdopen(tempFileDescriptor, 'r+') as tmp:
-            tmp.write(byteString)
-            tmp.flush()
-            os.fsync(tmp.fileno())
-            #TODO: Make the arguments work for editors other than Vim
-            editProc = subprocess.Popen(['notepad', tempFilePath])
-            #editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
-            editProc.communicate()
-            bytesFromFile = ""
-            tmp.seek(0)
-            for line in tmp:
-                if(line in hexLineEnd):
-                    break
-                else:
-                    bytesFromFile += line
-    finally:
-        os.remove(tempFilePath)
+
+    if (userOs == 'win32'):
+        tmp = open('DJPWindowsFile.txt', 'r+')
+        tmp.write(byteString)
+        tmp.close()
+        editProc = subprocess.Popen(['notepad', 'DJPWindowsFile.txt'])
+        editProc.communicate()
+        tmp = open('DJPWindowsFile.txt', 'r+')
+        bytesFromFile = ""
+        #tmp.seek(0)
+        for line in tmp:
+            if(line in hexLineEnd):
+                break
+            else:
+                print(line)
+                bytesFromFile += line
+        tmp.close()
+
+    else:
+        try:
+            with os.fdopen(tempFileDescriptor, 'r+') as tmp:
+                tmp.write(byteString)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+                #TODO: Make the arguments work for editors other than Vim
+                editProc = subprocess.Popen([editor, '-f', '-o', tempFilePath], close_fds=True, stdout=None)
+                editProc.communicate()
+                bytesFromFile = ""
+                tmp.seek(0)
+                for line in tmp:
+                    if(line in hexLineEnd):
+                        break
+                    else:
+                        bytesFromFile += line
+        finally:
+            #print('reached finally')
+            os.remove(tempFilePath)
 
     return(bytesFromFile)
 

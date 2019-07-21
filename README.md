@@ -7,10 +7,11 @@ This is accomplished by injecting JavaScript into the native process using the [
 * Inject into process
   * Linux (Using OpenSSL SSL_Read and SSL_Write)
   * Windows (Using schannel EncryptMessage [DecryptMessage todo])
-* Read/write data prior to outbound encryption (Linux and Windows)
-* Read/write data after inbound decryption (Linux works, Windows todo)
+* Read/write data prior to outbound encryption on Linux
+* Read/write data after inbound decryption on Linux
+* Read data prior to outbound encryption on Windows (write is todo)
 
-Note: Currently only Linux and Windows are supported. Linux supports the OpenSSL calls SSL_Write and SSL_Read
+Note: Currently only Linux and Windows are supported. Linux supports the OpenSSL calls SSL_Write and SSL_Read.
 
 ## Usage
 **Help**
