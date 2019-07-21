@@ -200,9 +200,6 @@ def edit_bytes_in_temp_file(byteString, userOs):
         editProc = subprocess.Popen(['notepad', 'DJPWindowsFile.txt'])
         editProc.communicate()
         tmp = open('DJPWindowsFile.txt', 'r+')
-        tmp.write(byteString)
-        tmp.close()
-        tmp = open('DJPWindowsFile.txt', 'r+')
         bytesFromFile = ""
         #tmp.seek(0)
         for line in tmp:
@@ -230,8 +227,8 @@ def edit_bytes_in_temp_file(byteString, userOs):
                     else:
                         bytesFromFile += line
         finally:
-            print('reached finally')
-        os.remove(tempFilePath)
+            #print('reached finally')
+            os.remove(tempFilePath)
 
     return(bytesFromFile)
 
